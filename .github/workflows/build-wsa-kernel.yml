@@ -289,15 +289,15 @@ jobs:
           
           if [ "${{ inputs.kernelsu_variant }}" == "SukiSU Nova" ]; then
             python3 - <<'PY'
-from pathlib import Path
-path = Path("drivers/kernelsu/policy/app_profile.c")
-text = path.read_text(encoding="utf-8")
-old = "test_thread_flag(TIF_SECCOMP)"
-if text.count(old) != 1:
-    raise SystemExit("Unexpected SukiSU seccomp check; refusing to patch")
-path.write_text(text.replace(old, "test_syscall_work(SECCOMP)", 1), encoding="utf-8")
-print("Adjusted SukiSU seccomp check for WSA generic entry")
-PY
+          from pathlib import Path
+          path = Path("drivers/kernelsu/policy/app_profile.c")
+          text = path.read_text(encoding="utf-8")
+          old = "test_thread_flag(TIF_SECCOMP)"
+          if text.count(old) != 1:
+              raise SystemExit("Unexpected SukiSU seccomp check; refusing to patch")
+          path.write_text(text.replace(old, "test_syscall_work(SECCOMP)", 1), encoding="utf-8")
+          print("Adjusted SukiSU seccomp check for WSA generic entry")
+          PY
           fi
           make olddefconfig
           if [ "${{ inputs.kernelsu_variant }}" == "SukiSU Nova" ]; then
