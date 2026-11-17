@@ -129,7 +129,7 @@ jobs:
             curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash $BRANCH
           elif [ "${{ inputs.kernelsu_variant }}" == "SukiSU Nova" ]; then
             echo "Adding SukiSU Nova with built-in SUSFS..."
-            curl -fLSs "https://raw.githubusercontent.com/SukiSU-Nova/SukiSU-Nova/builtin/kernel/setup.sh" | bash "$BRANCH"
+            curl -fLSs "https://raw.githubusercontent.com/SukiSU-Nova/SukiSU-Nova/builtin/kernel/setup.sh" | bash -s "$BRANCH"
           elif [ "${{ inputs.kernelsu_variant }}" == "MKSU" ]; then
             echo "Adding KernelSU MKSU..."
             curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash $BRANCH
@@ -166,17 +166,14 @@ jobs:
             echo "Applying SUSFS patches for KernelSU-Next..."
             cd ./KernelSU-Next
             cp ../../kernel_patches/KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch ./
-            patch -p1 --forward < KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch || true
-          elif [ "${{ inputs.kernelsu_variant }}" == "SukiSU Nova" ]; then
-            echo "Adding SukiSU Nova with built-in SUSFS..."
-            curl -fLSs "https://raw.githubusercontent.com/SukiSU-Nova/SukiSU-Nova/builtin/kernel/setup.sh" | bash "$BRANCH"
+            patch -p1 --forward < KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch
           elif [ "${{ inputs.kernelsu_variant }}" == "SukiSU Nova" ]; then
             echo "SUSFS is built into SukiSU Nova; skipping the legacy KernelSU SUSFS patch."
           elif [ "${{ inputs.kernelsu_variant }}" == "MKSU" ]; then
             echo "Applying SUSFS patches for MKSU..."
             cd ./KernelSU
             cp ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-            patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
+            patch -p1 --forward < 10_enable_susfs_for_ksu.patch
             
             echo "Applying MKSU specific SUSFS patch..."
             cp ../../kernel_patches/mksu_susfs.patch ../KernelSU/
@@ -255,6 +252,11 @@ jobs:
           sed -i 's/^CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-Wild+"/' ./scripts/setlocalversion
           
           make olddefconfig
+          if [ "${{ inputs.kernelsu_variant }}" == "SukiSU Nova" ]; then
+            grep -qx 'CONFIG_KSU=y' .config || { echo "KernelSU is not enabled after olddefconfig" >&2; exit 1; }
+            grep -qx 'CONFIG_KSU_SUSFS=y' .config || { echo "SUSFS is not enabled after olddefconfig" >&2; exit 1; }
+            grep -qx 'CONFIG_KSU_SUSFS_SUS_MAP=y' .config || { echo "SUSFS map support is not enabled after olddefconfig" >&2; exit 1; }
+          fi
           declare -A FILE_NAME=(["x86_64"]="bzImage" ["arm64"]="Image")
           make -j`nproc` LLVM=1 ARCH=${{ inputs.wsa_arch }} $(if [ "${{ inputs.wsa_arch }}" == "arm64" ]; then echo CROSS_COMPILE=aarch64-linux-gnu; fi) ${FILE_NAME[${{ inputs.wsa_arch }}]}
           declare -A ARCH_MAP_FILE=(["x86_64"]="x86" ["arm64"]="arm64")
