@@ -185,8 +185,39 @@ jobs:
 
           # Return to the WSA kernel root before applying the common patch
           cd "$GITHUB_WORKSPACE/$CONFIG"
-          # WSA omits one generic trace-hook include used as context by the upstream patch.
-          patch -p1 --forward --fuzz=1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch
+          python3 - <<'PY'
+          from pathlib import Path
+
+          patch_path = Path("50_add_susfs_in_gki-android13-5.15.patch")
+          text = patch_path.read_text(encoding="utf-8")
+          fixes = (
+              ("fs/namespace.c", "@@ -32,11 +32,21 @@", " #include <trace/hooks/blk.h>\n", "@@ -32,10 +32,20 @@"),
+              ("fs/proc/task_mmu.c", "@@ -22,6 +22,9 @@", " #include <trace/hooks/mm.h>\n", "@@ -22,5 +22,8 @@"),
+              ("kernel/sys.c", "@@ -661,6 +676,10 @@", " \\tbool ruid_new, euid_new, suid_new;\n", "@@ -661,5 +676,9 @@"),
+          )
+          for filename, old_header, missing_context, new_header in fixes:
+              start = text.index(f"diff --git a/{filename} b/{filename}")
+              end = text.find("\\ndiff --git ", start + 1)
+              if end < 0:
+                  end = len(text)
+              section = text[start:end]
+              if section.count(old_header) != 1:
+                  raise SystemExit(f"Unexpected SUSFS hunk count in {filename}")
+              hunk_start = section.index(old_header)
+              hunk_end = section.find("\\n@@ ", hunk_start + len(old_header))
+              if hunk_end < 0:
+                  hunk_end = len(section)
+              hunk = section[hunk_start:hunk_end]
+              if hunk.count(missing_context) != 1:
+                  raise SystemExit(f"Unexpected WSA context in {filename}")
+              hunk = hunk.replace(old_header, new_header, 1)
+              hunk = hunk.replace(missing_context, "", 1)
+              section = section[:hunk_start] + hunk + section[hunk_end:]
+              text = text[:start] + section + text[end:]
+          patch_path.write_text(text, encoding="utf-8")
+          print("Adjusted exactly three verified WSA-only SUSFS patch contexts")
+          PY
+          patch -p1 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch
 
       - name: Add SUSFS Configuration Settings
         run: |
