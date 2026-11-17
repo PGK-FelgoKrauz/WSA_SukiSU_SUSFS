@@ -96,7 +96,14 @@ jobs:
 
       - name: Determine the branch for KernelSU
         run: |
-          if [[ "${{ inputs.kernelsu_branch }}" == "Stable" ]]; then
+          if [[ "${{ inputs.kernelsu_variant }}" == "SukiSU Nova" ]]; then
+            if [[ "${{ inputs.kernelsu_branch }}" == "Other" && "${{ inputs.kernelsu_branch_other }}" == "builtin" ]]; then
+              echo "BRANCH=builtin" >> $GITHUB_ENV
+            else
+              echo "SukiSU Nova requires branch 'Other' and ref 'builtin'." >&2
+              exit 1
+            fi
+          elif [[ "${{ inputs.kernelsu_branch }}" == "Stable" ]]; then
               echo "BRANCH=-" >> $GITHUB_ENV
           elif [[ "${{ inputs.kernelsu_branch }}" == "Dev" && ( "${{ inputs.kernelsu_variant }}" == "Official" || "${{ inputs.kernelsu_variant }}" == "MKSU" ) ]]; then
               echo "BRANCH=-s main" >> $GITHUB_ENV
@@ -120,6 +127,9 @@ jobs:
           elif [ "${{ inputs.kernelsu_variant }}" == "Next" ]; then
             echo "Adding KernelSU Next..."
             curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash $BRANCH
+          elif [ "${{ inputs.kernelsu_variant }}" == "SukiSU Nova" ]; then
+            echo "Adding SukiSU Nova with built-in SUSFS..."
+            curl -fLSs "https://raw.githubusercontent.com/SukiSU-Nova/SukiSU-Nova/builtin/kernel/setup.sh" | bash "$BRANCH"
           elif [ "${{ inputs.kernelsu_variant }}" == "MKSU" ]; then
             echo "Adding KernelSU MKSU..."
             curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash $BRANCH
@@ -157,6 +167,11 @@ jobs:
             cd ./KernelSU-Next
             cp ../../kernel_patches/KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch ./
             patch -p1 --forward < KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch || true
+          elif [ "${{ inputs.kernelsu_variant }}" == "SukiSU Nova" ]; then
+            echo "Adding SukiSU Nova with built-in SUSFS..."
+            curl -fLSs "https://raw.githubusercontent.com/SukiSU-Nova/SukiSU-Nova/builtin/kernel/setup.sh" | bash "$BRANCH"
+          elif [ "${{ inputs.kernelsu_variant }}" == "SukiSU Nova" ]; then
+            echo "SUSFS is built into SukiSU Nova; skipping the legacy KernelSU SUSFS patch."
           elif [ "${{ inputs.kernelsu_variant }}" == "MKSU" ]; then
             echo "Applying SUSFS patches for MKSU..."
             cd ./KernelSU
@@ -173,7 +188,7 @@ jobs:
 
           # Change to common directory and apply common SUSFS patch
           cd ../
-          patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
+          patch -p1 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch
 
       - name: Add SUSFS Configuration Settings
         run: |
@@ -189,23 +204,36 @@ jobs:
 
           # Add SUSFS configuration settings
           echo "CONFIG_KSU=y" >> .config
-          echo "CONFIG_KSU_SUSFS=y" >> .config
-          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> .config
-          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> .config
-          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> .config
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> .config
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> .config
-          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> .config
-          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> .config
-          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> .config
-          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> .config
-          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> .config
-          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> .config
-          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> .config
-          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> .config
-          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> .config
-          echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> .config
-
+          if [ "${{ inputs.kernelsu_variant }}" == "SukiSU Nova" ]; then
+            echo "CONFIG_KSU_SUSFS=y" >> .config
+            echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> .config
+            echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> .config
+            echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> .config
+            echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> .config
+            echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> .config
+            echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> .config
+            echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> .config
+            echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> .config
+            echo "CONFIG_KSU_SUSFS_SUS_MAP=y" >> .config
+            echo "CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER=y" >> .config
+          else
+            echo "CONFIG_KSU_SUSFS=y" >> .config
+            echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> .config
+            echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> .config
+            echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> .config
+            echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> .config
+            echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> .config
+            echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> .config
+            echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> .config
+            echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> .config
+            echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> .config
+            echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> .config
+            echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> .config
+            echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> .config
+            echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> .config
+            echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> .config
+            echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> .config
+          fi
           # Add additional tmpfs config setting
           echo "CONFIG_TMPFS_XATTR=y" >> .config
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> .config
