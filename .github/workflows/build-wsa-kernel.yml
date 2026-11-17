@@ -214,8 +214,12 @@ jobs:
               hunk = hunk.replace(missing_context, "", 1)
               section = section[:hunk_start] + hunk + section[hunk_end:]
               text = text[:start] + section + text[end:]
+          if text.count("VMA_PAD_START(vma)") != 1:
+              raise SystemExit("Unexpected SUSFS VMA padding reference")
+          # WSA 5.15.104 has no VMA padding support; vm_end is its correct range end.
+          text = text.replace("VMA_PAD_START(vma)", "vma->vm_end", 1)
           patch_path.write_text(text, encoding="utf-8")
-          print("Adjusted exactly three verified WSA-only SUSFS patch contexts")
+          print("Adjusted three WSA contexts and the 5.15 VMA end fallback")
           PY
           patch -p1 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch
 
