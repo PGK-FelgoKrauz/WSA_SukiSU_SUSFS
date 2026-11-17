@@ -28,6 +28,7 @@ on:
           - Official
           - Next
           - MKSU
+          - SukiSU Nova
         default: Next
       kernelsu_branch:
         description: "Choose ksu branch"
