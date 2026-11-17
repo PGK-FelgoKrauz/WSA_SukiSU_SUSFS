@@ -287,11 +287,25 @@ jobs:
           sed -i 's/-dirty//' ./scripts/setlocalversion
           sed -i 's/^CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-Wild+"/' ./scripts/setlocalversion
           
+          if [ "${{ inputs.kernelsu_variant }}" == "SukiSU Nova" ]; then
+            python3 - <<'PY'
+from pathlib import Path
+path = Path("drivers/kernelsu/policy/app_profile.c")
+text = path.read_text(encoding="utf-8")
+old = "test_thread_flag(TIF_SECCOMP)"
+if text.count(old) != 1:
+    raise SystemExit("Unexpected SukiSU seccomp check; refusing to patch")
+path.write_text(text.replace(old, "test_syscall_work(SECCOMP)", 1), encoding="utf-8")
+print("Adjusted SukiSU seccomp check for WSA generic entry")
+PY
+          fi
           make olddefconfig
           if [ "${{ inputs.kernelsu_variant }}" == "SukiSU Nova" ]; then
             grep -qx 'CONFIG_KSU=y' .config || { echo "KernelSU is not enabled after olddefconfig" >&2; exit 1; }
             grep -qx 'CONFIG_KSU_SUSFS=y' .config || { echo "SUSFS is not enabled after olddefconfig" >&2; exit 1; }
             grep -qx 'CONFIG_KSU_SUSFS_SUS_MAP=y' .config || { echo "SUSFS map support is not enabled after olddefconfig" >&2; exit 1; }
+            make headers_install LLVM=1 ARCH=${{ inputs.wsa_arch }}
+            test -f usr/include/linux/unistd.h || { echo "UAPI headers missing; SukiSU preinit cannot be built" >&2; exit 1; }
           fi
           declare -A FILE_NAME=(["x86_64"]="bzImage" ["arm64"]="Image")
           make -j`nproc` LLVM=1 ARCH=${{ inputs.wsa_arch }} $(if [ "${{ inputs.wsa_arch }}" == "arm64" ]; then echo CROSS_COMPILE=aarch64-linux-gnu; fi) ${FILE_NAME[${{ inputs.wsa_arch }}]}
