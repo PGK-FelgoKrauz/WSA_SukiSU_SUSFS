@@ -185,7 +185,8 @@ jobs:
 
           # Return to the WSA kernel root before applying the common patch
           cd "$GITHUB_WORKSPACE/$CONFIG"
-          patch -p1 --forward < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch
+          # WSA omits one generic trace-hook include used as context by the upstream patch.
+          patch -p1 --forward --fuzz=1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch
 
       - name: Add SUSFS Configuration Settings
         run: |
